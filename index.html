@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Recommender App</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #007BFF;
+      color: white;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav {
+      display: flex;
+      gap: 10px;
+    }
+
+    nav button {
+      background: white;
+      color: #007BFF;
+      border: none;
+      padding: 8px 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    nav button:hover {
+      background: #0056b3;
+      color: white;
+    }
+
+    .container {
+      max-width: 1200px;
+      background: white;
+      margin: 50px auto;
+      padding: 80px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+
+    input {
+      width: 70%;
+      padding: 10px;
+    }
+
+    .recommend-btn {
+      padding: 10px;
+      margin-left: 10px;
+      background: green;
+      color: white;
+      border: none;
+    }
+
+    .clear-btn {
+      margin-top: 10px;
+      padding: 6px 10px;
+      background: red;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .suggestions {
+      background: #eee;
+      position: absolute;
+      z-index: 10;
+      width: 70%;
+    }
+
+    .suggestions div {
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    .suggestions div:hover {
+      background: #ddd;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      background: #f1f1f1;
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    footer {
+      background: #007BFF;
+      color: white;
+      text-align: center;
+      padding: 15px;
+      margin-top: auto; /* Pushes it to bottom */
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h2>📚🎬 Recommendetion System</h2>
+  <nav>
+    <button onclick="showSection('movie')">Home</button>
+    <button onclick="showSection('book')">Books</button>
+    <a href="/logout"><button style="background: #dc3545; color: white;">Logout</button></a>
+  </nav>
+</header>
+
+<!-- Movie Section -->
+<div class="container" id="movieSection">
+  <h3>Movie Recommendation</h3>
+  <input id="movieInput" placeholder="Type a movie..." onkeyup="suggestMovie()">
+  <div class="suggestions" id="movieSuggestions"></div>
+  <button class="recommend-btn" onclick="getMovieRecommendations()">Recommend</button>
+  <ul id="movieResults"></ul>
+  <h4>Search History</h4>
+  <ul id="movieHistory"></ul>
+  <button class="clear-btn" onclick="clearHistory('movie')">Clear History</button>
+</div>
+
+<!-- Book Section -->
+<div class="container hidden" id="bookSection">
+  <h3>Book Recommendation</h3>
+  <input id="bookInput" placeholder="Type a book..." onkeyup="suggestBook()">
+  <div class="suggestions" id="bookSuggestions"></div>
+  <button class="recommend-btn" onclick="getBookRecommendations()">Recommend</button>
+  <ul id="bookResults"></ul>
+  <h4>Search History</h4>
+  <ul id="bookHistory"></ul>
+  <button class="clear-btn" onclick="clearHistory('book')">Clear History</button>
+</div>
+
+<footer>
+  All Rights Reserved
+</footer>
+
+<script>
+  function showSection(section) {
+    document.getElementById('movieSection').classList.add('hidden');
+    document.getElementById('bookSection').classList.add('hidden');
+    document.getElementById(section + 'Section').classList.remove('hidden');
+  }
+
+  function updateHistory(type, name) {
+    let key = type + 'History';
+    let history = JSON.parse(localStorage.getItem(key)) || [];
+    if (!history.includes(name)) {
+      history.unshift(name);
+      if (history.length > 5) history.pop();
+      localStorage.setItem(key, JSON.stringify(history));
+    }
+    renderHistory(type);
+  }
+
+  function renderHistory(type) {
+    let history = JSON.parse(localStorage.getItem(type + 'History')) || [];
+    let container = document.getElementById(type + 'History');
+    container.innerHTML = history.map(item => `<li>${item}</li>`).join('');
+  }
+
+  function clearHistory(type) {
+    localStorage.removeItem(type + 'History');
+    renderHistory(type);
+  }
+
+  function selectItem(type, title) {
+    document.getElementById(type + 'Input').value = title;
+    document.getElementById(type + 'Suggestions').innerHTML = '';
+  }
+
+  async function suggestMovie() {
+    let q = document.getElementById('movieInput').value;
+    if (!q) return document.getElementById('movieSuggestions').innerHTML = '';
+    let res = await fetch(`/suggest_movie?q=${q}`);
+    let data = await res.json();
+    document.getElementById('movieSuggestions').innerHTML = data.map(title =>
+      `<div onclick="selectItem('movie','${title}')">${title}</div>`).join('');
+  }
+
+  async function suggestBook() {
+    let q = document.getElementById('bookInput').value;
+    if (!q) return document.getElementById('bookSuggestions').innerHTML = '';
+    let res = await fetch(`/suggest_book?q=${q}`);
+    let data = await res.json();
+    document.getElementById('bookSuggestions').innerHTML = data.map(title =>
+      `<div onclick="selectItem('book','${title}')">${title}</div>`).join('');
+  }
+
+  async function getMovieRecommendations() {
+    let movie = document.getElementById('movieInput').value;
+    if (!movie) return;
+    updateHistory('movie', movie);
+    let res = await fetch('/recommend_movie', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movie })
+    });
+    let data = await res.json();
+    document.getElementById('movieResults').innerHTML = data.map(title => `<li>${title}</li>`).join('');
+  }
+
+  async function getBookRecommendations() {
+    let book = document.getElementById('bookInput').value;
+    if (!book) return;
+    updateHistory('book', book);
+    let res = await fetch('/recommend_book', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ book })
+    });
+    let data = await res.json();
+    document.getElementById('bookResults').innerHTML = data.map(title => `<li>${title}</li>`).join('');
+  }
+
+  renderHistory('movie');
+  renderHistory('book');
+</script>
+
+</body>
+</html>
